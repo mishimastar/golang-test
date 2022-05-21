@@ -57,7 +57,10 @@ func myHandler(w http.ResponseWriter, r *http.Request) {
 		if len(key_v) == 0 {
 			w.WriteHeader(http.StatusBadRequest)
 		} else {
-			if _, found := PutQueues.queue[r.URL.Path]; found {
+			PutQueues.Lock()
+			_, found := PutQueues.queue[r.URL.Path]
+			PutQueues.Unlock()
+			if found {
 				w.WriteHeader(http.StatusOK)
 				PutQueues.Lock()
 				PutQueues.queue[r.URL.Path] = append(PutQueues.queue[r.URL.Path], key_v)
