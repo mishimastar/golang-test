@@ -16,6 +16,11 @@ var PutQueues = struct {
 	queue map[string][]string
 }{queue: make(map[string][]string)}
 
+var GetQueues = struct {
+	sync.Mutex
+	queue map[string][]*http.ResponseWriter
+}{queue: make(map[string][]*http.ResponseWriter)}
+
 func main() {
 	port_to_listen := flag.String("p", "80", "port to listen")
 	flag.Parse()
@@ -45,6 +50,32 @@ func myHandler(w http.ResponseWriter, r *http.Request) {
 				PutQueues.Unlock()
 			}
 
+		}
+	case "GET":
+		key_timeout := r.URL.Query().Get("timeout")
+		if len(key_timeout) == 0 {
+			GetQueues.Lock()
+			_, found := GetQueues.queue[r.URL.Path]
+			GetQueues.Unlock()
+			if !found {
+				PutQueues.Lock()
+				_, found := PutQueues.queue[r.URL.Path]
+				PutQueues.Unlock()
+				if found {
+					PutQueues.Lock()
+					w.Write([]byte(PutQueues.queue[r.URL.Path][0]))
+					PutQueues.queue[r.URL.Path] = PutQueues.queue[r.URL.Path][1:]
+					if len(PutQueues.queue[r.URL.Path]) == 0 {
+						delete(PutQueues.queue, r.URL.Path)
+					}
+					PutQueues.Unlock()
+					w.WriteHeader(http.StatusOK)
+				} else {
+					w.WriteHeader(http.StatusNotFound)
+				}
+			} else {
+				w.WriteHeader(http.StatusNotFound)
+			}
 		}
 	}
 }
