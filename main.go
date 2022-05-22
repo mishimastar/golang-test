@@ -30,45 +30,45 @@ var Queue = Queues{queue: make(map[string](chan string))}
 
 func main() {
 	// queue := Queues{queue: make(map[string](chan string))}
-	port_to_listen := flag.String("p", "80", "port to listen")
+	portToListen := flag.String("p", "80", "port to listen")
 	flag.Parse()
-	address := fmt.Sprintf("127.0.0.1:%s", *port_to_listen)
+	address := fmt.Sprintf("127.0.0.1:%s", *portToListen)
 	http.HandleFunc("/", myHandler)
 	fmt.Println("Listening on", address, "...")
 	log.Fatal(http.ListenAndServe(address, nil))
 }
 
 func myHandler(w http.ResponseWriter, r *http.Request) {
-	request_path := r.URL.Path
+	requestPath := r.URL.Path
 	switch r.Method {
 	case "PUT":
-		key_v := r.URL.Query().Get("v")
-		if len(key_v) == 0 {
+		keyV := r.URL.Query().Get("v")
+		if len(keyV) == 0 {
 			w.WriteHeader(http.StatusBadRequest)
 		} else {
-			Queue.pathInQueue(request_path)
+			Queue.pathInQueue(requestPath)
 			w.WriteHeader(http.StatusOK)
 			go func() {
-				Queue.queue[request_path] <- key_v
+				Queue.queue[requestPath] <- keyV
 			}()
 
 		}
 	case "GET":
-		key_timeout := r.URL.Query().Get("timeout")
-		timeout, err := strconv.Atoi(key_timeout)
+		keyTimeout := r.URL.Query().Get("timeout")
+		timeout, err := strconv.Atoi(keyTimeout)
 		switch {
-		case len(key_timeout) == 0:
+		case len(keyTimeout) == 0:
 			timeout = 0
 		case err != nil:
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		Queue.pathInQueue(request_path)
+		Queue.pathInQueue(requestPath)
 		select {
 		case <-time.After(time.Duration(timeout) * time.Second):
 			w.WriteHeader(http.StatusNotFound)
 			return
-		case answer := <-Queue.queue[request_path]:
+		case answer := <-Queue.queue[requestPath]:
 			w.Write([]byte(answer))
 			w.WriteHeader(http.StatusOK)
 			return
