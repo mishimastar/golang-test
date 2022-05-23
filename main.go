@@ -15,15 +15,14 @@ type Queues struct {
 	queue map[string](chan string)
 }
 
-func (q *Queues) pathInQueue(path string) {
-	q.mu.RLock()
+func (q *Queues) pathInQueue(path string) chan string {
+	q.mu.Lock()
+	defer q.mu.Unlock()
 	_, found := q.queue[path]
-	q.mu.RUnlock()
 	if !found {
-		q.mu.Lock()
 		q.queue[path] = make(chan string)
-		q.mu.Unlock()
 	}
+	return q.queue[path]
 }
 
 var Queue = Queues{queue: make(map[string](chan string))}
@@ -46,10 +45,9 @@ func myHandler(w http.ResponseWriter, r *http.Request) {
 		if len(keyV) == 0 {
 			w.WriteHeader(http.StatusBadRequest)
 		} else {
-			Queue.pathInQueue(requestPath)
 			w.WriteHeader(http.StatusOK)
 			go func() {
-				Queue.queue[requestPath] <- keyV
+				Queue.pathInQueue(requestPath) <- keyV
 			}()
 
 		}
@@ -63,12 +61,11 @@ func myHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		Queue.pathInQueue(requestPath)
 		select {
 		case <-time.After(time.Duration(timeout) * time.Second):
 			w.WriteHeader(http.StatusNotFound)
 			return
-		case answer := <-Queue.queue[requestPath]:
+		case answer := <-Queue.pathInQueue(requestPath):
 			w.Write([]byte(answer))
 			w.WriteHeader(http.StatusOK)
 			return
